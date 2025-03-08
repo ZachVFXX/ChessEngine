@@ -1,18 +1,30 @@
+from engine import Engine
 import pygame
 
 
-def main() -> None:
+def main():
     pygame.init()
     screen = pygame.display.set_mode((1280, 720))
     clock = pygame.time.Clock()
+    enngine = Engine()
+
     running = True
+
     while running:
+        # poll for events
+        # pygame.QUIT event means the user clicked X to close your window
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-        screen.fill((0, 0, 0))
+
+        # fill the screen with a color to wipe away anything from last frame
+        screen.fill("purple")
+
+        # flip() the display to put your work on screen
         pygame.display.flip()
-        clock.tick(60)
+
+        dt = clock.tick(60) / 1000
+    pygame.quit()
 
 
 if __name__ == "__main__":
