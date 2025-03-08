@@ -1,6 +1,7 @@
 import pygame
 
-def main():
+
+def main() -> None:
     pygame.init()
     screen = pygame.display.set_mode((1280, 720))
     clock = pygame.time.Clock()
@@ -12,6 +13,7 @@ def main():
         screen.fill((0, 0, 0))
         pygame.display.flip()
         clock.tick(60)
+
 
 if __name__ == "__main__":
     main()
