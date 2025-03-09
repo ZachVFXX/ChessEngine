@@ -36,7 +36,7 @@ def main() -> None:
     # Create the Chess UI system
     chess_ui = ChessUI(engine)
 
-    game_state: GameState = GameState.BLACK_WIN
+    game_state: GameState = GameState.PLAYING
 
     # Load assets
 

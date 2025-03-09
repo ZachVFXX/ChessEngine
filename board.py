@@ -54,7 +54,9 @@ class Board:
     def clear_board(self) -> list[Piece]:
         return [Piece(PieceType.EMPTY, i, Color.EMPTY) for i in range(64)]
 
-    def load_fen_notation(self, fen: str) -> None:
+    def load_fen_notation(
+        self, fen: str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    ) -> None:
         """Load a fen string to the board
 
         Format: <piece_placement> <active_color> <castling_rights> <en_passant> <halfmove> <fullmove>
