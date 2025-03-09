@@ -9,7 +9,7 @@ CELL_SIZE: int = 80
 def draw_grid(screen: pygame.Surface) -> None:
     for row in range(8):
         for column in range(8):
-            color = LIGHT_BG_COLOR if (row + column) % 2 != 0 else DARK_BG_COLOR
+            color = DARK_BG_COLOR if (row + column) % 2 != 0 else LIGHT_BG_COLOR
             pygame.draw.rect(
                 screen,
                 color,
@@ -53,9 +53,25 @@ def load_assets() -> dict[str, pygame.Surface]:
             "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - white classic/Queen.png"
         ),
         "R": pygame.image.load(
-            "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - black classic/Rook.png"
+            "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - white classic/Rook.png"
         ),
     }
+
+
+def scaled_assets(
+    dict_of_surface: dict[str, pygame.Surface],
+) -> dict[str, pygame.Surface]:
+    for key in dict_of_surface:
+        image = dict_of_surface[key]
+        scale_factor = CELL_SIZE / image.get_width()
+        dict_of_surface[key] = pygame.transform.scale(
+            image,
+            (
+                image.get_width() * scale_factor,
+                image.get_height() * scale_factor,
+            ),
+        )
+    return dict_of_surface
 
 
 def draw_pieces(
@@ -67,18 +83,30 @@ def draw_pieces(
             piece = engine.board[counter]
             color = piece.color
             piece_type = piece.piece_type
-            if piece_type == PieceType.EMPTY:
-                print("NONE")
-            else:
+            if piece_type != PieceType.EMPTY:
                 letter = (
                     piece.piece_type.value
                     if color == Color.BLACK
                     else piece.piece_type.value.upper()
                 )
+                image = dict_of_sprite[letter]
                 screen.blit(
-                    dict_of_sprite[letter], (column * CELL_SIZE, row * CELL_SIZE)
+                    image,
+                    (column * CELL_SIZE, row * CELL_SIZE),
                 )
             counter += 1
+
+
+def get_index_from_mouse_pos() -> int | None:
+    x, y = pygame.mouse.get_pos()
+    if pygame.mouse.get_just_released()[0]:
+        x = int(x / CELL_SIZE)
+        y = int(y / CELL_SIZE)
+        print("clicked at: ", x, y)
+        index = y * 8 + x
+        print("index:", index)
+        return index
+    return None
 
 
 def main() -> None:
@@ -86,10 +114,12 @@ def main() -> None:
     screen = pygame.display.set_mode((1280, 720))
     clock = pygame.time.Clock()
     engine = Engine()
-
+    engine.print_current_board()
     dict_of_sprite = load_assets()
+    scaled_asset = scaled_assets(dict_of_sprite)
 
     running = True
+    selected_index = None
 
     while running:
         # poll for events
@@ -101,11 +131,11 @@ def main() -> None:
         # fill the screen with a color to wipe away anything from last frame
         screen.fill("purple")
         draw_grid(screen)
-        draw_pieces(screen, engine, dict_of_sprite)
-        # flip() the display to put your work on screen
-        pygame.display.flip()
+        draw_pieces(screen, engine, scaled_asset)
 
+        pygame.display.flip()
         dt = clock.tick(60) / 1000
+
     pygame.quit()
 
 
