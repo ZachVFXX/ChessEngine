@@ -322,6 +322,7 @@ class ChessUI:
 
                 # Execute the move in the engine
                 self.engine.make_move(anim["from_index"], anim["to_index"])
+                self.play_move_sound(anim["type"])
 
         # Remove completed animations from back to front
         for i in reversed(completed_indices):
@@ -398,6 +399,12 @@ class ChessUI:
         # Draw the dragged piece on top
         if self.dragging and self.drag_piece_index is not None:
             self.draw_dragged_piece(screen)
+
+    def play_move_sound(self, move_type: AnimationType):
+        if move_type == AnimationType.MOVE:
+            pygame.mixer.Sound("assets/sounds/move.mp3").play()
+        elif move_type == AnimationType.CAPTURE:
+            pygame.mixer.Sound("assets/sounds/capture.mp3").play()
 
     def draw_grid(self, screen):
         """Draw the chess board grid."""

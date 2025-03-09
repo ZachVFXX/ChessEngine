@@ -5,7 +5,7 @@ class Engine(Board):
     def __init__(self):
         super().__init__()
         self.load_fen_notation(
-            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+            "r1b1kb1r/pp2pppp/2n5/8/3P1q2/2PQ4/PP2PPPP/R4KNR w kq - 1 9"
         )
 
     def _get_pawn_moves(self, position: int) -> list[int]:
