@@ -97,16 +97,88 @@ def draw_pieces(
             counter += 1
 
 
-def get_index_from_mouse_pos() -> int | None:
-    x, y = pygame.mouse.get_pos()
-    if pygame.mouse.get_just_released()[0]:
-        x = int(x / CELL_SIZE)
-        y = int(y / CELL_SIZE)
-        print("clicked at: ", x, y)
-        index = y * 8 + x
-        print("index:", index)
-        return index
-    return None
+def handle_piece_selection_and_movement(
+    engine: Engine,
+    mouse_pos: tuple[int, int],
+    mouse_clicked: bool,
+    selected_index: int,
+    list_of_moves: list[int],
+) -> tuple[int, list[int]]:
+    """
+    Handle selecting chess pieces and making moves when a user clicks on the board.
+
+    Args:
+        engine: The chess engine instance
+        mouse_pos: The current mouse position (x, y)
+        mouse_clicked: Boolean indicating if mouse was just clicked
+        selected_index: The currently selected piece index (or None)
+        list_of_moves: List of legal moves for the selected piece
+
+    Returns:
+        tuple: (new_selected_index, new_list_of_moves)
+    """
+    if not mouse_clicked:
+        return selected_index, list_of_moves
+
+    # Convert mouse position to board coordinates
+    x, y = mouse_pos
+    x = int(x / CELL_SIZE)
+    y = int(y / CELL_SIZE)
+
+    # Ensure coordinates are within board boundaries
+    if not (0 <= x < 8 and 0 <= y < 8):
+        return selected_index, list_of_moves
+
+    # Calculate board index
+    clicked_index = y * 8 + x
+
+    # If a piece is already selected
+    if selected_index is not None:
+        # Check if the clicked position is a legal move
+        if clicked_index in list_of_moves:
+            # Make the move
+            engine.make_move(selected_index, clicked_index)
+            # Reset selection after move
+            return None, []
+        else:
+            # If clicking on a different square that's not a legal move
+            # Check if it's a piece that can be selected
+            piece = engine.board[clicked_index]
+            if (
+                piece.piece_type != PieceType.EMPTY
+                and piece.color == engine.active_color
+            ):
+                # Select new piece and get its legal moves
+                legal_moves = engine.get_legal_moves(clicked_index)
+                return clicked_index, legal_moves
+            # If clicking on empty square or opponent's piece, deselect
+            return None, []
+    else:
+        # If no piece is selected yet, try to select one
+        piece = engine.board[clicked_index]
+        if piece.piece_type != PieceType.EMPTY and piece.color == engine.active_color:
+            # Get legal moves for the selected piece
+            legal_moves = engine.get_legal_moves(clicked_index)
+            return clicked_index, legal_moves
+
+    # Default - no changes
+    return selected_index, list_of_moves
+
+
+def draw_legal_moves(screen, list_of_moves):
+    """
+    Draw indicators for legal moves on the screen.
+
+    Args:
+        screen: Pygame screen surface
+        list_of_moves: List of legal move indices
+    """
+    for move in list_of_moves:
+        pos_x = int((move % 8) * CELL_SIZE + CELL_SIZE / 2)
+        pos_y = int((move // 8) * CELL_SIZE + CELL_SIZE / 2)
+        pygame.draw.circle(
+            screen, pygame.Color(255, 255, 255, 10), (pos_x, pos_y), CELL_SIZE / 4
+        )
 
 
 def main() -> None:
@@ -120,6 +192,7 @@ def main() -> None:
 
     running = True
     selected_index = None
+    list_of_move = []
 
     while running:
         # poll for events
@@ -132,6 +205,15 @@ def main() -> None:
         screen.fill("purple")
         draw_grid(screen)
         draw_pieces(screen, engine, scaled_asset)
+
+        selected_index, list_of_move = handle_piece_selection_and_movement(
+            engine,
+            pygame.mouse.get_pos(),
+            pygame.mouse.get_just_pressed()[0],
+            selected_index,
+            list_of_move,
+        )
+        draw_legal_moves(screen, list_of_move)
 
         pygame.display.flip()
         dt = clock.tick(60) / 1000

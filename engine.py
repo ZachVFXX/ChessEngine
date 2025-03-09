@@ -455,7 +455,7 @@ class Engine(Board):
                 # Remove the captured pawn
                 capture_pos = to_pos + (8 if piece.color == Color.WHITE else -8)
                 self.board[capture_pos] = Piece(
-                    PieceType.EMPTY, capture_pos, Color.NONE
+                    PieceType.EMPTY, capture_pos, Color.EMPTY
                 )
 
         # Save capture info for halfmove clock
