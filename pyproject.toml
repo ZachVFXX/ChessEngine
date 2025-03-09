@@ -5,5 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "flask>=3.1.0",
     "pygame-ce>=2.5.3",
+    "pygame-gui>=0.6.13",
+    "requests[security]>=2.32.3",
 ]

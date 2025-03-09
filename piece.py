@@ -1,4 +1,4 @@
-from enum import StrEnum, Enum
+from enum import Enum
 
 
 class Color(Enum):
@@ -7,7 +7,7 @@ class Color(Enum):
     BLACK = 2
 
 
-class PieceType(StrEnum):
+class PieceType(str, Enum):
     PAWN = "p"
     KNIGHT = "n"
     BISHOP = "b"

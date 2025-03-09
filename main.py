@@ -1,8 +1,8 @@
 from engine import Engine, Color
 import pygame
-from button import Button
 from ui import ChessUI
-from enum import StrEnum
+from enum import Enum
+import pygame_gui
 
 asset_paths = {
     "k": "assets/Classic/Pieces/Chess - black classic/King.png",
@@ -20,10 +20,11 @@ asset_paths = {
 }
 
 
-class GameState(StrEnum):
+class GameState(str, Enum):
     PLAYING = "playing"
     BLACK_WIN = "black_win"
     WHITE_WIN = "white_win"
+    MAIN_MENU = "main_menu"
 
 
 def main() -> None:
@@ -32,22 +33,35 @@ def main() -> None:
     screen = pygame.display.set_mode((1280, 720))
     clock = pygame.time.Clock()
     engine = Engine()
+    manager = pygame_gui.UIManager((1280, 720))
+    play_button = pygame_gui.elements.UIButton(
+        relative_rect=pygame.Rect((350, 275), (100, 50)),
+        text="Play",
+        manager=manager,
+        object_id="main_menu_play_game",
+        visible=False,
+    )
 
     # Create the Chess UI system
     chess_ui = ChessUI(engine)
 
-    game_state: GameState = GameState.PLAYING
+    game_state: GameState = GameState.MAIN_MENU
 
     # Load assets
-
     chess_ui.load_assets(asset_paths)
 
     running = True
     while running:
+        dt = clock.tick(60) / 1000.0
+
         # Poll for events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            if event.type == pygame_gui.UI_BUTTON_PRESSED:
+                if event.ui_element == play_button:
+                    game_state = GameState.PLAYING
+            manager.process_events(event)
 
         if game_state == GameState.PLAYING:
             if engine.is_checkmate(Color.BLACK):
@@ -74,43 +88,26 @@ def main() -> None:
 
         if game_state == GameState.BLACK_WIN:
             screen.fill(pygame.Color(0, 0, 0))
-            surface = pygame.font.SysFont("arial", 24).render(
-                "Black win", True, pygame.Color(255, 255, 255)
+            go_back_button = pygame_gui.elements.UIButton(
+                (250, 250), "Go back", manager
             )
-            screen.blit(
-                surface,
-                (
-                    screen.get_width() / 2 - surface.get_width() / 2,
-                    screen.get_height() / 2 - surface.get_height() / 2,
-                ),
-            )
-            button = Button(
-                (100, 100),
-                (100, 50),
-                (255, 255, 255),
-                (0, 0, 0),
-                (0, 0, 0),
-                text="Back",
-            )
-            button.draw(screen)
 
         if game_state == GameState.WHITE_WIN:
             screen.fill(pygame.Color(255, 255, 255))
-            surface = pygame.font.SysFont("arial", 24).render(
-                "White win", True, pygame.Color(0, 0, 0)
-            )
-            screen.blit(
-                surface,
-                (
-                    screen.get_width() / 2 - surface.get_width() / 2,
-                    screen.get_height() / 2 - surface.get_height() / 2,
-                ),
+            go_back_button = pygame_gui.elements.UIButton(
+                (250, 250), "Go back", manager
             )
 
+        if game_state == GameState.MAIN_MENU:
+            screen.fill(pygame.Color(255, 255, 255))
+            play_button.visible = True
+        else:
+            play_button.visible = False
+        manager.update(dt)
+        manager.draw_ui(screen)
         # Update display
         pygame.display.flip()
-        clock.tick(60)
-
+        pygame.display.update()
     pygame.quit()
 
 
