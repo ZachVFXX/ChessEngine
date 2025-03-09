@@ -1,22 +1,22 @@
 from engine import Engine, Color
 import pygame
-
+from button import Button
 from ui import ChessUI
 from enum import StrEnum
 
 asset_paths = {
-    "k": "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - black classic/King.png",
-    "n": "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - black classic/Knight.png",
-    "b": "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - black classic/Bishop.png",
-    "p": "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - black classic/Pawn.png",
-    "q": "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - black classic/Queen.png",
-    "r": "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - black classic/Rook.png",
-    "K": "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - white classic/King.png",
-    "N": "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - white classic/Knight.png",
-    "B": "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - white classic/Bishop.png",
-    "P": "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - white classic/Pawn.png",
-    "Q": "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - white classic/Queen.png",
-    "R": "/home/zach/Dev/ChessEngine/assets/Classic/Pieces/Chess - white classic/Rook.png",
+    "k": "assets/Classic/Pieces/Chess - black classic/King.png",
+    "n": "assets/Classic/Pieces/Chess - black classic/Knight.png",
+    "b": "assets/Classic/Pieces/Chess - black classic/Bishop.png",
+    "p": "assets/Classic/Pieces/Chess - black classic/Pawn.png",
+    "q": "assets/Classic/Pieces/Chess - black classic/Queen.png",
+    "r": "assets/Classic/Pieces/Chess - black classic/Rook.png",
+    "K": "assets/Classic/Pieces/Chess - white classic/King.png",
+    "N": "assets/Classic/Pieces/Chess - white classic/Knight.png",
+    "B": "assets/Classic/Pieces/Chess - white classic/Bishop.png",
+    "P": "assets/Classic/Pieces/Chess - white classic/Pawn.png",
+    "Q": "assets/Classic/Pieces/Chess - white classic/Queen.png",
+    "R": "assets/Classic/Pieces/Chess - white classic/Rook.png",
 }
 
 
@@ -36,7 +36,7 @@ def main() -> None:
     # Create the Chess UI system
     chess_ui = ChessUI(engine)
 
-    game_state: GameState = GameState.PLAYING
+    game_state: GameState = GameState.BLACK_WIN
 
     # Load assets
 
@@ -84,6 +84,15 @@ def main() -> None:
                     screen.get_height() / 2 - surface.get_height() / 2,
                 ),
             )
+            button = Button(
+                (100, 100),
+                (100, 50),
+                (255, 255, 255),
+                (0, 0, 0),
+                (0, 0, 0),
+                text="Back",
+            )
+            button.draw(screen)
 
         if game_state == GameState.WHITE_WIN:
             screen.fill(pygame.Color(255, 255, 255))
