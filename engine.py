@@ -244,7 +244,9 @@ class Engine(Board):
 
         # Place a temporary piece of the opposite color
         temp_color = Color.BLACK if by_color == Color.WHITE else Color.WHITE
-        self.board[position] = Piece(PieceType.PAWN, position, temp_color)
+        self.board[position] = Piece(
+            piece_type=PieceType.PAWN, board_index=position, color=temp_color
+        )
 
         # Check if any of the opponent's pieces can move to this square
         for i, piece in enumerate(self.board):
@@ -453,7 +455,9 @@ class Engine(Board):
                 # Remove the captured pawn
                 capture_pos = to_pos + (8 if piece.color == Color.WHITE else -8)
                 self.board[capture_pos] = Piece(
-                    PieceType.EMPTY, capture_pos, Color.EMPTY
+                    piece_type=PieceType.EMPTY,
+                    board_index=capture_pos,
+                    color=Color.EMPTY,
                 )
 
         # Save capture info for halfmove clock

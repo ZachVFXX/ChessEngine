@@ -1,29 +1,89 @@
-from socket import socket, AF_INET, SOCK_STREAM, gethostbyname
+import socket
+import threading
+from piece import Message, Piece, move
+from pydantic import TypeAdapter
+from protocols import Request, Response
 
 
 class Client:
-    def __init__(self):
-        self.client_socket = socket(AF_INET, SOCK_STREAM)
-        self.client_socket.connect((gethostbyname("127.0.0.1"), 12397))
+    def __init__(self, host="127.0.0.1", port=55555):
+        self.nickname = None
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server.connect((host, port))
 
-        try:
-            self._create_connection()
-        except Exception as e:
-            print(f"Error when connecting to the server: {e}")
+        self.closed = False
+        self.started = False
+        self.opponent_data = None
+        self.winner = None
 
-    def _create_connection(self):
-        self.client_socket.send("Starting connection with the server".encode())
-        response = self.client_socket.recv(1024).decode()
-        print(response)
+    def start(self):
+        receive_thread = threading.Thread(target=self.receive)
+        receive_thread.start()
 
-    def send(self, message: str):
-        self.client_socket.send(message.encode())
-        response = self.client_socket.recv(1024).decode()
-        print(response)
+    def send(self, request: Request, message: str):
+        data = Message(type=request, data=message)
+        packed_message = Message.pack(data)
+        self.server.send(packed_message)
+
+    def receive(self):
+        while not self.closed:
+            try:
+                message = Message.recv_message(self.server)
+                if message is None:
+                    break
+                print(f"Received message: {message}")
+                self.handle_response(message)
+            except Exception as e:
+                print(f"Error receiving message: {e}")
+                break
+        self.close()
+
+    def close(self):
+        self.closed = True
+        self.server.close()
+
+    def handle_response(self, response: Message):
+        r_type = response.type
+        data = response.data
+
+        if r_type == Response.NICKNAME:
+            self.send(Request.NICKNAME, self.nickname)
+        elif r_type == Response.OPPONENT:
+            self.opponent_data = data
+            print(f"Opponent: {self.opponent_data}")
+        elif r_type == Response.START:
+            self.started = True
+            print("Game started!")
+        elif r_type == Response.DONE_MOVE:
+            print(f"Move done: {data}")
+        elif r_type == Response.WINNER:
+            self.winner = data
+            print(f"Winner: {self.winner}")
+            self.close()
+        elif r_type == Response.OPPONENT_LEFT:
+            print("Opponent left the game.")
+            self.close()
+        elif r_type == Response.BOARD_STATE:
+            print("Board state")
+            ListPieceValidator = TypeAdapter(list[Piece])
+            board = ListPieceValidator.validate_json(data)
+            board_state = board
+            print(board_state)
+
+    def make_move(self, from_pos: int, to_pos: int):
+        move_data = move(from_=from_pos, to_=to_pos)
+        self.send(Request.TRY_MOVE, move_data)
 
 
 if __name__ == "__main__":
     client = Client()
-    for i in range(10):
-        message = input("send: ")
-        client.send(message)
+    client.nickname = input("Enter your nickname: ")
+    client.start()
+
+    while not client.closed:
+        print("xxxxxxxxxxxxxxxx")
+        if client.started:
+            print("playing")
+            from_pos = int(input("Enter the position to move from: "))
+            to_pos = int(input("Enter the position to move to: "))
+            client.make_move(from_pos, to_pos)

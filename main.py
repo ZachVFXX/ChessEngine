@@ -1,3 +1,5 @@
+import pygame_gui.core.text
+import pygame_gui.ui_manager
 from engine import Engine, Color
 import pygame
 from ui import ChessUI
@@ -25,6 +27,7 @@ class GameState(str, Enum):
     BLACK_WIN = "black_win"
     WHITE_WIN = "white_win"
     MAIN_MENU = "main_menu"
+    OPTION_MENU = "option_menu"
 
 
 def main() -> None:
@@ -32,15 +35,16 @@ def main() -> None:
     pygame.font.init()
     screen = pygame.display.set_mode((1280, 720))
     clock = pygame.time.Clock()
-    engine = Engine()
     manager = pygame_gui.UIManager((1280, 720))
+
     play_button = pygame_gui.elements.UIButton(
         relative_rect=pygame.Rect((350, 275), (100, 50)),
         text="Play",
-        manager=manager,
         object_id="main_menu_play_game",
         visible=False,
     )
+
+    engine = Engine()
 
     # Create the Chess UI system
     chess_ui = ChessUI(engine)
@@ -88,19 +92,16 @@ def main() -> None:
 
         if game_state == GameState.BLACK_WIN:
             screen.fill(pygame.Color(0, 0, 0))
-            go_back_button = pygame_gui.elements.UIButton(
-                (250, 250), "Go back", manager
-            )
+            go_back_button = pygame_gui.elements.UIButton((250, 250), "Go back")
 
         if game_state == GameState.WHITE_WIN:
             screen.fill(pygame.Color(255, 255, 255))
-            go_back_button = pygame_gui.elements.UIButton(
-                (250, 250), "Go back", manager
-            )
+            go_back_button = pygame_gui.elements.UIButton((250, 250), "Go back")
 
         if game_state == GameState.MAIN_MENU:
-            screen.fill(pygame.Color(255, 255, 255))
+            screen.fill(pygame.Color(36, 26, 4))
             play_button.visible = True
+            pygame_gui.elements.UILabel((1000, 100), "Coucou")
         else:
             play_button.visible = False
         manager.update(dt)

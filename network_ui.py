@@ -1,38 +1,11 @@
 import pygame
 import time
 from enum import Enum
-from typing import Protocol
-
-
-class Color(Enum):
-    EMPTY = 0
-    WHITE = 1
-    BLACK = 2
-
-
-class PieceType(str, Enum):
-    PAWN = "p"
-    KNIGHT = "n"
-    BISHOP = "b"
-    ROOK = "r"
-    QUEEN = "q"
-    KING = "k"
-    EMPTY = "0"
-
-
-class Piece:
-    def __init__(self, piece_type: PieceType, board_index: int, color: Color):
-        self.piece_type = piece_type
-        self.board_index = board_index
-        self.color = color
-
-    def __repr__(self) -> str:
-        return f"{self.color.name} {self.piece_type.name}"
-
-
-class Engine(Protocol):
-    board: list[Piece]
-    active_color: bool
+from typing import List
+from client import Client
+from pydantic import TypeAdapter
+from protocols import Response
+from piece import Piece, PieceType, Color, Message
 
 
 class InputMode(Enum):
@@ -51,12 +24,12 @@ class AnimationType(Enum):
     PROMOTION = 4
 
 
-class ChessUI:
-    """A reusable Chess UI system with animation and input handling."""
+class NetworkChessUI:
+    """A Chess UI system with animation and input handling that works with a client-server architecture."""
 
     def __init__(
         self,
-        engine: Engine,
+        client,
         cell_size=80,
         light_color=(245, 164, 66),
         dark_color=(54, 32, 6),
@@ -65,24 +38,33 @@ class ChessUI:
         Initialize the Chess UI system.
 
         Args:
-            engine: The chess engine instance
+            client: The network client instance
             cell_size: Size of each board cell in pixels
             light_color: RGB color for light squares
             dark_color: RGB color for dark squares
         """
-        self.engine: Engine = engine
+        self.client: Client = client
         self.cell_size = cell_size
         self.light_color = pygame.Color(*light_color)
         self.dark_color = pygame.Color(*dark_color)
+
+        # Board state (will be updated from server)
+        self.board = self._create_empty_board()
+        self.active_color = Color.WHITE
+        self.my_color = None  # Will be set when game starts
 
         # Input state
         self.selected_index = None
         self.dragging = False
         self.drag_piece_index = None
         self.drag_offset = (0, 0)
-        self.list_of_moves = []
+        self.legal_moves = []
         self.time_mouse_down = None
         self.mouse_pos_prev = (0, 0)
+
+        # Game state
+        self.is_my_turn = False
+        self.game_started = False
 
         # Animation state
         self.animations = []
@@ -95,6 +77,87 @@ class ChessUI:
 
         # Assets
         self.piece_assets = {}
+
+        # Set up client message handler
+        self._setup_client_handlers()
+
+    def _create_empty_board(self) -> List[Piece]:
+        """Create an empty chess board."""
+        board = []
+        for i in range(64):
+            board.append(
+                Piece(piece_type=PieceType.EMPTY, board_index=i, color=Color.EMPTY)
+            )
+        return board
+
+    def _setup_client_handlers(self):
+        """Set up handlers for client messages."""
+        # Store the original handler
+        original_handler = self.client.handle_response
+
+        # Create a new handler that processes messages for the UI
+        def ui_handler(response: Message):
+            r_type = response.type
+            data = response.data
+            print(response)
+
+            # Handle responses that affect the UI
+            if r_type == "START":
+                self.game_started = True
+            elif r_type == Response.COLOR:
+                self.my_color = data
+
+            elif r_type == "OPPONENT_MOVE" or r_type == "DONE_MOVE":
+                # Update the board and animate the move
+                from_pos = data.from_
+                to_pos = data.to_
+
+                if self.enable_animations:
+                    self.animate_move(from_pos, to_pos)
+                else:
+                    self._update_board_after_move(from_pos, to_pos)
+
+                # Update turn
+                self.is_my_turn = r_type == "DONE_MOVE"
+            elif r_type == "BOARD_STATE":
+                # Full board update from server
+                ListPieceValidator = TypeAdapter(list[Piece])
+                board = ListPieceValidator.validate_json(data)
+                self._update_board_from_data(board)
+            elif r_type == Response.LEGAL_MOVES:
+                # Update legal moves for selected piece
+                self.legal_moves = data
+
+            # Call the original handler as well
+            original_handler(response)
+
+        # Replace the client's handler with our new one
+        self.client.handle_response = ui_handler
+
+    def _update_board_from_data(self, board_state: list[Piece]):
+        """Update the board state from server data."""
+        if not board_state:
+            return
+
+        for i in range(len(board_state)):
+            self.board[i] = board_state[i]
+
+    def _update_board_after_move(self, from_index, to_index):
+        """Update the board state after a move."""
+        # Simple board update (server will send full board state later)
+        if 0 <= from_index < 64 and 0 <= to_index < 64:
+            # Move the piece
+            self.board[to_index] = self.board[from_index]
+            self.board[to_index].board_index = to_index
+            # Clear the old position
+            self.board[from_index] = Piece(
+                piece_type=PieceType.EMPTY, board_index=from_index, color=Color.EMPTY
+            )
+
+            # Toggle active color
+            self.active_color = (
+                Color.BLACK if self.active_color == Color.WHITE else Color.WHITE
+            )
 
     def load_assets(self, asset_paths):
         """
@@ -132,6 +195,10 @@ class ChessUI:
         Returns:
             bool: True if a move was made, False otherwise
         """
+        # If it's not our turn or game hasn't started, ignore input
+        if not self.is_my_turn or not self.game_started:
+            return False
+
         mouse_x, mouse_y = mouse_pos
         left_button, _, _ = mouse_state
         did_move = False
@@ -155,11 +222,8 @@ class ChessUI:
 
             # Pre-select a piece if it's valid, but don't commit to click or drag yet
             if valid_coords:
-                piece = self.engine.board[current_index]
-                if (
-                    piece.piece_type != PieceType.EMPTY
-                    and piece.color == self.engine.active_color
-                ):
+                piece = self.board[current_index]
+                if piece.piece_type != PieceType.EMPTY and piece.color == self.my_color:
                     # Calculate drag offset for potential dragging
                     piece_center_x = (board_x * self.cell_size) + (self.cell_size / 2)
                     piece_center_y = (board_y * self.cell_size) + (self.cell_size / 2)
@@ -168,8 +232,10 @@ class ChessUI:
                         piece_center_y - mouse_y,
                     )
 
-                    # Get legal moves
-                    self.list_of_moves = self.engine.get_legal_moves(current_index)
+                    # Request legal moves from server
+                    self.client.send("GET_LEGAL_MOVES", current_index)
+                    # We'll use empty list until server responds
+                    self.legal_moves = []
 
                     # Store the index for both potential click and drag
                     self.selected_index = current_index
@@ -196,15 +262,27 @@ class ChessUI:
             # Check if we were dragging
             if self.dragging and self.drag_piece_index is not None:
                 # Handle drop
-                if valid_coords and current_index in self.list_of_moves:
-                    self.engine.make_move(self.drag_piece_index, current_index)
+                if valid_coords and current_index in self.legal_moves:
+                    # Send move request to server
+                    self.client.make_move(self.drag_piece_index, current_index)
+
+                    # Optimistically update the board and show animation
+                    if self.enable_animations:
+                        self.animate_move(self.drag_piece_index, current_index)
+                    else:
+                        self._update_board_after_move(
+                            self.drag_piece_index, current_index
+                        )
+
+                    # Assume it's no longer our turn until server confirms
+                    self.is_my_turn = False
                     did_move = True
 
                 # Reset drag state
                 self.dragging = False
                 self.drag_piece_index = None
-                self.drag_offPieceTypeset = (0, 0)
-                self.list_of_moves = []
+                self.drag_offset = (0, 0)
+                self.legal_moves = []
 
             # Handle click (if short press and not dragging)
             elif time_pressed < self.click_threshold_ms and not self.dragging:
@@ -212,46 +290,51 @@ class ChessUI:
                     # If we already had a piece selected
                     if self.selected_index is not None:
                         # Try to move if it's a legal move
-                        if current_index in self.list_of_moves:
+                        if current_index in self.legal_moves:
+                            # Send move request to server
+                            self.client.make_move(self.selected_index, current_index)
+
+                            # Optimistically update and animate
                             if self.enable_animations:
                                 self.animate_move(self.selected_index, current_index)
                             else:
-                                self.engine.make_move(
+                                self._update_board_after_move(
                                     self.selected_index, current_index
                                 )
+
+                            # Assume it's no longer our turn until server confirms
+                            self.is_my_turn = False
                             self.selected_index = None
-                            self.list_of_moves = []
+                            self.legal_moves = []
                             did_move = True
                         # If clicking on our own piece, select it instead
                         elif (
-                            self.engine.board[current_index].piece_type
-                            != PieceType.EMPTY
-                            and self.engine.board[current_index].color
-                            == self.engine.active_color
+                            self.board[current_index].piece_type != PieceType.EMPTY
+                            and self.board[current_index].color == self.my_color
                         ):
                             self.selected_index = current_index
-                            self.list_of_moves = self.engine.get_legal_moves(
-                                self.selected_index
-                            )
+                            # Request legal moves from server
+                            self.client.send("GET_LEGAL_MOVES", current_index)
+                            self.legal_moves = []  # Clear until server responds
                         # Clicking elsewhere deselects
                         else:
                             self.selected_index = None
-                            self.list_of_moves = []
+                            self.legal_moves = []
                     # No piece was selected yet
                     else:
-                        piece = self.engine.board[current_index]
+                        piece = self.board[current_index]
                         if (
                             piece.piece_type != PieceType.EMPTY
-                            and piece.color == self.engine.active_color
+                            and piece.color == self.my_color
                         ):
                             self.selected_index = current_index
-                            self.list_of_moves = self.engine.get_legal_moves(
-                                self.selected_index
-                            )
+                            # Request legal moves from server
+                            self.client.send("GET_LEGAL_MOVES", current_index)
+                            self.legal_moves = []  # Clear until server responds
                 else:
                     # Clicking outside the board deselects
                     self.selected_index = None
-                    self.list_of_moves = []
+                    self.legal_moves = []
 
             # Reset time tracker
             self.time_mouse_down = None
@@ -270,7 +353,7 @@ class ChessUI:
             to_index: Ending board index
         """
         # Get piece details
-        piece: list[Piece] = self.engine.board[from_index]
+        piece = self.board[from_index]
 
         # Calculate start and end positions
         from_row, from_col = from_index // 8, from_index % 8
@@ -283,7 +366,7 @@ class ChessUI:
         anim_type = AnimationType.MOVE
 
         # Check if it's a capture
-        if self.engine.board[to_index].piece_type != PieceType.EMPTY:
+        if self.board[to_index].piece_type != PieceType.EMPTY:
             anim_type = AnimationType.CAPTURE
 
         # Create the animation
@@ -352,8 +435,9 @@ class ChessUI:
                 completed_indices.append(i)
                 self.play_move_sound(anim["type"])
 
-                # Execute the move in the engine
-                self.engine.make_move(anim["from_index"], anim["to_index"])
+                # Update the board state once animation completes
+                # (Server will confirm the move and send official state)
+                self._update_board_after_move(anim["from_index"], anim["to_index"])
 
         # Remove completed animations from back to front
         for i in reversed(completed_indices):
@@ -370,6 +454,9 @@ class ChessUI:
         """
         # Draw the board grid
         self.draw_grid(screen)
+
+        # Display game status (waiting, opponent's turn, etc.)
+        self.draw_game_status(screen)
 
         # Highlight selected piece (click mode)
         if self.selected_index is not None and not self.dragging:
@@ -406,7 +493,7 @@ class ChessUI:
         self.draw_animations(screen)
 
         # Draw legal move indicators
-        for move in self.list_of_moves:
+        for move in self.legal_moves:
             row = move // 8
             col = move % 8
             pos_x = int(col * self.cell_size + self.cell_size / 2)
@@ -431,11 +518,29 @@ class ChessUI:
         if self.dragging and self.drag_piece_index is not None:
             self.draw_dragged_piece(screen)
 
+    def draw_game_status(self, screen):
+        """Draw the current game status."""
+        status_text = ""
+        if not self.game_started:
+            status_text = "Waiting for opponent..."
+        elif not self.is_my_turn:
+            status_text = "Opponent's turn"
+        else:
+            status_text = "Your turn"
+
+        font = pygame.font.SysFont("Arial", 24)
+        text_surface = font.render(status_text, True, (255, 255, 255))
+        screen.blit(text_surface, (10, 8 * self.cell_size + 10))
+
     def play_move_sound(self, move_type: AnimationType):
         if move_type == AnimationType.MOVE:
-            pygame.mixer.Sound("assets/sounds/move.mp3").play()
+            pygame.mixer.Sound(
+                "/home/zach/Dev/ChessEngine/assets/sounds/move.mp3"
+            ).play()
         elif move_type == AnimationType.CAPTURE:
-            pygame.mixer.Sound("assets/sounds/capture.mp3").play()
+            pygame.mixer.Sound(
+                "/home/zach/Dev/ChessEngine/assets/sounds/capture.mp3"
+            ).play()
 
     def draw_grid(self, screen):
         """Draw the chess board grid."""
@@ -472,7 +577,7 @@ class ChessUI:
                     counter += 1
                     continue
 
-                piece = self.engine.board[counter]
+                piece = self.board[counter]
                 color = piece.color
                 piece_type = piece.piece_type
                 if piece_type != PieceType.EMPTY:
@@ -487,11 +592,12 @@ class ChessUI:
                             image,
                             (column * self.cell_size, row * self.cell_size),
                         )
+
                 counter += 1
 
     def draw_dragged_piece(self, screen):
         """Draw the currently dragged piece."""
-        piece = self.engine.board[self.drag_piece_index]
+        piece = self.board[self.drag_piece_index]
         color = piece.color
         piece_type = piece.piece_type
         if piece_type != PieceType.EMPTY:
@@ -502,7 +608,6 @@ class ChessUI:
             )
             if letter in self.piece_assets:
                 image = self.piece_assets[letter]
-                image = pygame.transform.hsl(image, lightness=-0.5)
 
                 # Get mouse position and apply offset
                 mouse_x, mouse_y = pygame.mouse.get_pos()

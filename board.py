@@ -1,12 +1,22 @@
 from piece import Piece, Color, PieceType
+from pydantic import RootModel
 
 CHAR_TO_COLUMN = {"a": 0, "b": 1, "c": 2, "d": 3, "e": 4, "f": 5, "g": 6, "h": 7}
 COLUMN_TO_CHAR = {v: k for k, v in CHAR_TO_COLUMN.items()}
 
 
+class BoardPieceList(RootModel):
+    root: list[Piece]
+
+
 class Board:
     def __init__(self):
-        self.board: list[Piece] = self.clear_board()
+        self.board: BoardPieceList = BoardPieceList(
+            root=[
+                Piece(piece_type=PieceType.EMPTY, board_index=i, color=Color.EMPTY)
+                for i in range(64)
+            ]
+        )
         self.active_color: Color = Color.WHITE
         self.white_can_castle_queen_side: bool = False
         self.white_can_castle_king_side: bool = False
@@ -19,7 +29,9 @@ class Board:
     def _move(self, from_: int, to_: int) -> None:
         self.board[to_] = self.board[from_]
         self.board[to_].board_index = to_
-        self.board[from_] = Piece(PieceType.EMPTY, from_, Color.EMPTY)
+        self.board[from_] = Piece(
+            piece_type=PieceType.EMPTY, board_index=from_, color=Color.EMPTY
+        )
 
     def _get_index_from_pgn(self, pgn: str) -> int:
         """Get the index for the board array from an pgn format string
@@ -52,7 +64,10 @@ class Board:
         return f"{column}{row}"
 
     def clear_board(self) -> list[Piece]:
-        return [Piece(PieceType.EMPTY, i, Color.EMPTY) for i in range(64)]
+        return [
+            Piece(piece_type=PieceType.EMPTY, board_index=i, color=Color.EMPTY)
+            for i in range(64)
+        ]
 
     def load_fen_notation(
         self, fen: str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -108,7 +123,9 @@ class Board:
             else:
                 color = Color.WHITE if char.isupper() else Color.BLACK
                 piece_type = PieceType(char.lower())
-                self.board[board_index] = Piece(piece_type, board_index, color)
+                self.board[board_index] = Piece(
+                    piece_type=piece_type, board_index=board_index, color=color
+                )
                 board_index += 1
 
     def print_current_board(self) -> None:
