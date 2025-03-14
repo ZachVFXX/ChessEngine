@@ -1,6 +1,6 @@
-import socket
 import threading
 from piece import Message, Color
+import socket
 from protocols import Response, Request
 from rooms import Room
 
@@ -78,7 +78,7 @@ class Server:
         )
 
         self.send(Response.COLOR, Color.WHITE, client)
-        self.send(Response.COLOR, Color.WHITE, self.waiting_for_pair)
+        self.send(Response.COLOR, Color.BLACK, self.waiting_for_pair)
 
         self.rooms[client] = room
         self.rooms[self.waiting_for_pair] = room

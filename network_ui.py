@@ -4,7 +4,7 @@ from enum import Enum
 from typing import List
 from client import Client
 from pydantic import TypeAdapter
-from protocols import Response
+from protocols import Response, Request
 from piece import Piece, PieceType, Color, Message
 
 
@@ -102,12 +102,17 @@ class NetworkChessUI:
             print(response)
 
             # Handle responses that affect the UI
-            if r_type == "START":
+            if r_type == Response.START:
                 self.game_started = True
             elif r_type == Response.COLOR:
-                self.my_color = data
+                if int(data) == Color.WHITE.value:
+                    self.my_color = Color.WHITE
+                elif int(data) == Color.BLACK.value:
+                    self.my_color = Color.BLACK
+                else:
+                    raise FileNotFoundError
 
-            elif r_type == "OPPONENT_MOVE" or r_type == "DONE_MOVE":
+            elif r_type == Response.OPPONENT_MOVE or r_type == Response.DONE_MOVE:
                 # Update the board and animate the move
                 from_pos = data.from_
                 to_pos = data.to_
@@ -118,8 +123,8 @@ class NetworkChessUI:
                     self._update_board_after_move(from_pos, to_pos)
 
                 # Update turn
-                self.is_my_turn = r_type == "DONE_MOVE"
-            elif r_type == "BOARD_STATE":
+                self.is_my_turn = r_type == Response.DONE_MOVE
+            elif r_type == Response.BOARD_STATE:
                 # Full board update from server
                 ListPieceValidator = TypeAdapter(list[Piece])
                 board = ListPieceValidator.validate_json(data)
@@ -136,9 +141,6 @@ class NetworkChessUI:
 
     def _update_board_from_data(self, board_state: list[Piece]):
         """Update the board state from server data."""
-        if not board_state:
-            return
-
         for i in range(len(board_state)):
             self.board[i] = board_state[i]
 
@@ -233,7 +235,7 @@ class NetworkChessUI:
                     )
 
                     # Request legal moves from server
-                    self.client.send("GET_LEGAL_MOVES", current_index)
+                    self.client.send(Request, current_index)
                     # We'll use empty list until server responds
                     self.legal_moves = []
 
@@ -314,7 +316,7 @@ class NetworkChessUI:
                         ):
                             self.selected_index = current_index
                             # Request legal moves from server
-                            self.client.send("GET_LEGAL_MOVES", current_index)
+                            self.client.send(Request.GET_LEGAL_MOVES, current_index)
                             self.legal_moves = []  # Clear until server responds
                         # Clicking elsewhere deselects
                         else:
@@ -329,7 +331,7 @@ class NetworkChessUI:
                         ):
                             self.selected_index = current_index
                             # Request legal moves from server
-                            self.client.send("GET_LEGAL_MOVES", current_index)
+                            self.client.send(Request.GET_LEGAL_MOVES, current_index)
                             self.legal_moves = []  # Clear until server responds
                 else:
                     # Clicking outside the board deselects

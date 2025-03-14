@@ -33,9 +33,8 @@ class Client:
                     break
                 print(f"Received message: {message}")
                 self.handle_response(message)
-            except Exception as e:
-                print(f"Error receiving message: {e}")
-                break
+            except Exception:
+                raise
         self.close()
 
     def close(self):
